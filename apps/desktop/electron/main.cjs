@@ -2213,7 +2213,10 @@ function buildApplicationMenu() {
 }
 
 function toggleDevTools(window) {
-  if (!DEV_SERVER) return
+  // DevTools is enabled in packaged builds so users can diagnose renderer
+  // issues without needing a dev build. Trade-off: tiny attack surface
+  // increase versus a much better support story when WS connection or
+  // CSP issues surface in the field.
   const { webContents } = window
   if (webContents.isDevToolsOpened()) {
     webContents.closeDevTools()
@@ -2223,7 +2226,7 @@ function toggleDevTools(window) {
 }
 
 function installDevToolsShortcut(window) {
-  if (!DEV_SERVER) return
+  // F12 / Cmd+Opt+I works in both dev and packaged builds.
   window.webContents.on('before-input-event', (event, input) => {
     const key = input.key.toLowerCase()
     const isInspectShortcut =
@@ -2740,7 +2743,7 @@ function createWindow() {
       webviewTag: true,
       sandbox: true,
       nodeIntegration: false,
-      devTools: Boolean(DEV_SERVER)
+      devTools: true
     }
   })
 
