@@ -254,8 +254,23 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, herme
 // Manifest + stage dispatch
 // ---------------------------------------------------------------------------
 
-async function fetchManifest({ scriptPath, emit, hermesHome }) {
-  const result = await spawnPowerShell(scriptPath, ['-Manifest'], {
+// Build the install.ps1 pin args (-Commit / -Branch) from the install-stamp
+// so the repository stage clones the exact SHA the .exe was tested with
+// instead of falling back to install.ps1's default ($Branch = "main").
+function buildPinArgs(installStamp) {
+  const args = []
+  if (installStamp && installStamp.commit) {
+    args.push('-Commit', installStamp.commit)
+  }
+  if (installStamp && installStamp.branch) {
+    args.push('-Branch', installStamp.branch)
+  }
+  return args
+}
+
+async function fetchManifest({ scriptPath, emit, hermesHome, installStamp }) {
+  const pinArgs = buildPinArgs(installStamp)
+  const result = await spawnPowerShell(scriptPath, ['-Manifest', ...pinArgs], {
     emit,
     stageName: '__manifest__',
     hermesHome
@@ -294,13 +309,14 @@ function parseStageResult(stdout) {
   return null
 }
 
-async function runStage({ scriptPath, stage, emit, hermesHome, abortSignal }) {
+async function runStage({ scriptPath, stage, emit, hermesHome, abortSignal, installStamp }) {
   const startedAt = Date.now()
   emit({ type: 'stage', name: stage.name, state: 'running' })
 
+  const pinArgs = buildPinArgs(installStamp)
   const result = await spawnPowerShell(
     scriptPath,
-    ['-Stage', stage.name, '-NonInteractive', '-Json'],
+    ['-Stage', stage.name, '-NonInteractive', '-Json', ...pinArgs],
     { emit, stageName: stage.name, abortSignal, hermesHome }
   )
 
@@ -400,7 +416,7 @@ async function runBootstrap(opts) {
     const scriptInfo = await resolveInstallScript({ installStamp, sourceRepoRoot, hermesHome, emit })
 
     // 2. Fetch manifest
-    const manifest = await fetchManifest({ scriptPath: scriptInfo.path, emit, hermesHome })
+    const manifest = await fetchManifest({ scriptPath: scriptInfo.path, emit, hermesHome, installStamp })
     emit({
       type: 'manifest',
       stages: manifest.stages,
@@ -416,7 +432,7 @@ async function runBootstrap(opts) {
         emit({ type: 'failed', error: 'bootstrap cancelled by user' })
         return { ok: false, cancelled: true }
       }
-      const ev = await runStage({ scriptPath: scriptInfo.path, stage, emit, hermesHome, abortSignal })
+      const ev = await runStage({ scriptPath: scriptInfo.path, stage, emit, hermesHome, abortSignal, installStamp })
       if (ev.state === 'failed') {
         emit({ type: 'failed', stage: stage.name, error: ev.error || 'stage failed' })
         return { ok: false, failedStage: stage.name, error: ev.error }
