@@ -139,7 +139,8 @@ const EMPTY_STATE: DesktopBootstrapState = {
   error: null,
   log: [],
   startedAt: null,
-  completedAt: null
+  completedAt: null,
+  unsupportedPlatform: null
 }
 
 function applyEvent(state: DesktopBootstrapState, ev: DesktopBootstrapEvent): DesktopBootstrapState {
@@ -181,6 +182,18 @@ function applyEvent(state: DesktopBootstrapState, ev: DesktopBootstrapEvent): De
   }
   if (ev.type === 'failed') {
     return { ...state, active: false, error: ev.error || 'unknown error' }
+  }
+  if (ev.type === 'unsupported-platform') {
+    return {
+      ...state,
+      active: false,
+      unsupportedPlatform: {
+        platform: ev.platform,
+        activeRoot: ev.activeRoot,
+        installCommand: ev.installCommand,
+        docsUrl: ev.docsUrl
+      }
+    }
   }
   return state
 }
@@ -229,10 +242,71 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
     if (!enabled) return false
     if (state.active) return true
     if (state.error) return true
+    if (state.unsupportedPlatform) return true
     return false
-  }, [enabled, state.active, state.error])
+  }, [enabled, state.active, state.error, state.unsupportedPlatform])
 
   if (!shouldShow) return null
+
+  // Unsupported-platform branch: macOS/Linux packaged builds hit this when
+  // there's no Hermes Agent installed yet and we can't drive install.sh
+  // (no stage protocol equivalent yet). Show a copy-paste install command
+  // and the docs URL; user runs it from Terminal and relaunches the app.
+  if (state.unsupportedPlatform) {
+    const ups = state.unsupportedPlatform
+    const platformLabel = ups.platform === 'darwin' ? 'macOS' : ups.platform === 'linux' ? 'Linux' : ups.platform
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-md">
+        <div className="w-full max-w-xl rounded-xl border bg-card p-8 shadow-xl">
+          <h2 className="text-2xl font-semibold tracking-tight">Hermes needs a one-time install</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Automated first-launch install isn{'\u2019'}t available on {platformLabel} yet. Open Terminal and
+            run the command below, then relaunch this app. Subsequent launches will skip this step.
+          </p>
+
+          <div className="mt-4">
+            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Install command</div>
+            <pre className="overflow-x-auto rounded-md border bg-muted/50 px-3 py-2.5 font-mono text-[12px]">
+              <code>{ups.installCommand}</code>
+            </pre>
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(ups.installCommand).catch(() => {})
+                }}
+              >
+                Copy command
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  window.hermesDesktop?.openExternal?.(ups.docsUrl)
+                }}
+              >
+                View install docs
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between border-t pt-4">
+            <span className="text-xs text-muted-foreground">
+              Will install to <code className="rounded bg-muted/50 px-1 py-0.5 font-mono">{ups.activeRoot}</code>
+            </span>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              I{'\u2019'}ve run it -- retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const stages = state.manifest?.stages || []
   const currentStage = stages.find(s => state.stages[s.name]?.state === 'running')?.name

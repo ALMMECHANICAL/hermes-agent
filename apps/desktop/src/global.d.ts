@@ -199,6 +199,13 @@ export interface DesktopBootstrapStageResult {
   error: string | null
 }
 
+export interface DesktopBootstrapUnsupportedPlatform {
+  platform: string
+  activeRoot: string
+  installCommand: string
+  docsUrl: string
+}
+
 export interface DesktopBootstrapState {
   active: boolean
   manifest: { type: 'manifest'; stages: DesktopBootstrapStageDescriptor[]; protocolVersion: number | null } | null
@@ -207,6 +214,7 @@ export interface DesktopBootstrapState {
   log: Array<{ ts: number; stage: string | null; line: string }>
   startedAt: number | null
   completedAt: number | null
+  unsupportedPlatform: DesktopBootstrapUnsupportedPlatform | null
 }
 
 export type DesktopBootstrapEvent =
@@ -222,6 +230,13 @@ export type DesktopBootstrapEvent =
   | { type: 'log'; stage?: string | null; line: string }
   | { type: 'complete'; marker: Record<string, unknown> }
   | { type: 'failed'; stage?: string | null; error: string }
+  | {
+      type: 'unsupported-platform'
+      platform: string
+      activeRoot: string
+      installCommand: string
+      docsUrl: string
+    }
 
 
 export interface HermesApiRequest {
