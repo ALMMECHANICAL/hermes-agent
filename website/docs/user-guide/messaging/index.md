@@ -395,4 +395,4 @@ Each platform has its own toolset:
 - [BlueBubbles Setup (iMessage)](bluebubbles.md)
 - [QQBot Setup](qqbot.md)
 - [Open WebUI + API Server](open-webui.md)
-- [Webhooks](webhooks.md)
+- [Webhooks](GitHub/Agents%20and%20MCPs/multi%20agent%20voice/hermes-agent/website/docs/user-guide/messaging/webhooks.md)
